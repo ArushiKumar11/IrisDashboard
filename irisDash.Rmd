@@ -1,0 +1,229 @@
+---
+title: "Iris Dataset Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(plotly)
+library(ggplot2)
+library(shiny)
+
+data(iris)
+```
+
+
+```{r}
+
+set.seed(123) # For reproducibility
+iris_kmeans <- kmeans(iris[, -5], centers = 3) 
+
+iris$Cluster <- as.factor(iris_kmeans$cluster)
+
+
+
+
+iris_pca <- prcomp(iris[, 1:4])$x[, 1:2] 
+iris$PCA1 <- iris_pca[, 1]
+iris$PCA2 <- iris_pca[, 2]
+
+```
+
+```{r}
+
+```
+
+# Sidebar {.sidebar}
+### About the Iris Dataset
+
+The Iris dataset, also known as Fisher's Iris dataset, was introduced by statistician Ronald Fisher in 1936. It includes measurements from three species of Iris flowers:
+
+- **Iris setosa**
+- **Iris virginica** 
+- **Iris versicolor**
+
+#### Features Measured:
+- Sepal Length (cm)
+- Sepal Width (cm)
+- Petal Length (cm)
+- Petal Width (cm)
+
+#### Dataset Properties:
+- 150 total samples
+- 50 samples per species
+- 4 numeric features
+- No missing values
+
+
+# Summary 
+## Row 1
+```{r}
+
+plot_ly(data = iris, x = ~PCA1, y = ~PCA2, color = ~Cluster,
+        type = "scatter", mode = "markers") %>%
+  layout(title = "PCA Plot: Cluster Visualization",
+         xaxis = list(title = "PCA1"),
+         yaxis = list(title = "PCA2"))
+
+
+```
+<br>
+
+
+```{r}
+
+iris$Petal.Area <- iris$Petal.Length * iris$Petal.Width
+iris$Sepal.Area <- iris$Sepal.Length * iris$Sepal.Width
+
+
+plot_ly(data = iris, x = ~Sepal.Area, y = ~Petal.Area, color = ~Species,
+        type = 'scatter', mode = 'markers', opacity = 0.8) %>%
+  layout(title = "Petal Area vs. Sepal Area",
+         xaxis = list(title = "Sepal Area (Length × Width)"),
+         yaxis = list(title = "Petal Area (Length × Width)"))
+```
+
+# Individual Analysis
+
+## Scatter Plot {.tabset}
+
+### Petal
+
+```{r}
+plot_ly(data = iris, x = ~Petal.Length, y = ~Petal.Width, color = ~Species,
+        type = 'scatter', mode = 'markers')|>
+  layout(title = "Petal Dimensions: Length vs. Width",
+         xaxis = list(title = "Petal Length"),
+         yaxis = list(title = "Petal Width"))
+
+```
+
+### Sepal
+
+```{r}
+plot_ly(data = iris, x = ~Sepal.Length, y = ~Sepal.Width, color = ~Species,
+        type = 'scatter', mode = 'markers') %>%
+  layout(title = "Sepal Dimensions: Length vs. Width",
+         xaxis = list(title = "Sepal Length"),
+         yaxis = list(title = "Sepal Width"))
+
+
+```
+
+## Histogram {.tabset}
+
+### Petal Length
+
+```{r}
+plot_ly(data = iris, x = ~Petal.Length, color = ~Species, type = 'histogram',
+        autobinx = TRUE, opacity = 0.7) %>%
+  layout(title = "Distribution of Petal Length",
+         xaxis = list(title = "Petal Length"),
+         yaxis = list(title = "Count"))
+
+```
+
+### Sepal Length
+
+```{r}
+plot_ly(data = iris, x = ~Sepal.Length, color = ~Species, type = 'histogram',
+        autobinx = TRUE, opacity = 0.7) %>%
+  layout(title = "Distribution of Sepal Length",
+         xaxis = list(title = "Sepal Length"),
+         yaxis = list(title = "Count"))
+
+```
+
+## Density Plot {.tabset}
+
+### Petal Width
+
+```{r}
+
+
+density_plot <- ggplot(iris, aes(x = Petal.Width, fill = Species)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density Plot: Petal Width", x = "Petal Width", y = "Density")
+
+ggplotly(density_plot)
+
+
+```
+
+### Sepal Width
+
+```{r}
+
+
+density_plot <- ggplot(iris, aes(x = Sepal.Width, fill = Species)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density Plot: Sepal Width", x = "Sepal Width", y = "Density")
+
+ggplotly(density_plot)
+
+
+```
+
+## Box Plot {.tabset}
+
+### Petal Length
+
+```{r}
+plot_ly(data = iris, y = ~Petal.Length, color = ~Species, type = 'box') %>%
+  layout(title = "Petal Length Across Species",
+         yaxis = list(title = "Petal Length"))
+
+```
+
+### Sepal Length
+
+```{r}
+plot_ly(data = iris, y = ~Sepal.Length, color = ~Species, type = 'box') %>%
+  layout(title = "Sepal Length Across Species",
+         yaxis = list(title = "Sepal Length"))
+
+```
+
+# Predictor
+
+```{r}
+
+column(
+  width = 4,
+  sliderInput("sepal_length", "Sepal Length:", min = 4.1, max = 8, value = 5.5),
+  sliderInput("sepal_width", "Sepal Width:", min = 2, max = 4.5, value = 3),
+  sliderInput("petal_length", "Petal Length:", min = .1, max = 7, value = 4),
+  sliderInput("petal_width", "Petal Width:", min = 0.1, max = 2.5, value = 1),
+  actionButton("predict", "Predict Species")
+)
+
+renderText({
+  input$predict
+  
+  isolate({
+    new_data <- data.frame(
+      Sepal.Length = input$sepal_length,
+      Sepal.Width = input$sepal_width,
+      Petal.Length = input$petal_length,
+      Petal.Width = input$petal_width
+    )
+    
+
+    distances <- apply(iris_kmeans$centers, 1, function(center) {
+      sum((center - unlist(new_data))^2)
+    })
+    predicted_cluster <- which.min(distances)
+    name_list <- list("setosa", "versicolor", "virginica")
+
+
+    paste("Predicted Species Cluster:", name_list[[predicted_cluster]])
+  })
+})
+
+```
